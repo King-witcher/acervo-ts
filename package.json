@@ -1,0 +1,11 @@
+{
+  "name": "acervo-ts",
+  "type": "module",
+  "devDependencies": {
+    "@biomejs/biome": "2.2.5",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}
