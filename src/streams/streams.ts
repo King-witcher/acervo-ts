@@ -42,10 +42,10 @@ export namespace Streams {
      * @param generator The async generator to buffer
      * @param bufferSize The maximum number of items to buffer
      */
-    export async function* buffered<T>(
+    export function buffered<T>(
         generator: AsyncGenerator<T>,
         bufferSize: number,
-    ) {
+    ): AsyncGenerator<T> {
         // A concession is a token that allows a worker to process a new item.
         // The bufferSize limits how many items can be stored in memory at once.
         // If a concession is true, the worker is free to process a new item.
@@ -63,6 +63,7 @@ export namespace Streams {
         // Start a worker that will process the generator as concessions come in
         ;(async () => {
             while (await concessions.receive()) {
+                console.log('concession received')
                 const { value, done } = await generator.next()
                 if (done) {
                     results.send(null)
@@ -73,14 +74,18 @@ export namespace Streams {
         })()
 
         // Yields results as they come and make new concessions
-        for await (const item of results.iter()) {
-            if (item === null) {
-                concessions.send(false)
-                break
+        async function* generate() {
+            for await (const item of results.iter()) {
+                if (item === null) {
+                    concessions.send(false)
+                    break
+                }
+                yield item.data
+                concessions.send(true)
             }
-            yield item.data
-            concessions.send(true)
         }
+
+        return generate()
     }
 
     /**
@@ -92,7 +97,7 @@ export namespace Streams {
      * @param concurrency The maximum number of concurrent workers
      */
     export async function* bufferedConcurrent<T>(
-        generator: AsyncGenerator<T>,
+        generator: Generator<Promise<T>>,
         bufferSize: number,
         concurrency: number,
     ) {
@@ -119,13 +124,13 @@ export namespace Streams {
                 while (await concessions.receive()) {
                     // If has received a concession, but the generator is finished, kill the worker
                     if (finished) break
-                    const { value, done } = await generator.next()
+                    const { value, done } = generator.next()
                     if (done) {
                         finished = true
                         results.send(null)
                         break
                     }
-                    results.send({ data: value })
+                    results.send({ data: await value })
                 }
             })
 
@@ -141,7 +146,7 @@ export namespace Streams {
         }
     }
 
-    export async function* concurrent<T>(
+    export async function* readConcurrent<T>(
         generator: AsyncGenerator<T>,
         concurrency: number,
     ) {
