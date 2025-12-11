@@ -11,7 +11,19 @@ export namespace Result {
             .then((value) => new Ok<T, E>(value))
             .catch((error) => new Err(error as E))
     }
+
+    /** Deserializes a SerializableResult into a Result. */
+    export function deserialize<T, E>(
+        obj: SerializableResult<T, E>,
+    ): Result<T, E> {
+        if (obj._tag === 'Ok') return new Ok(obj.value)
+        else return new Err(obj.error)
+    }
 }
+
+export type SerializableResult<T, E> =
+    | { _tag: 'Ok'; value: T }
+    | { _tag: 'Err'; error: E }
 
 export function ok<T, E>(value: T): Result<T, E> {
     return new Ok(value)
@@ -156,6 +168,15 @@ class Ok<T, E> {
     asPromise(): Promise<T> {
         return Promise.resolve(this.value)
     }
+
+    /**
+     * Serializes the Result into a SerializableResult.
+     *
+     * Note: the value T and error E must be serializable.
+     */
+    serialize(): SerializableResult<T, E> {
+        return { _tag: 'Ok', value: this.value }
+    }
 }
 
 class Err<T, E> {
@@ -204,5 +225,9 @@ class Err<T, E> {
 
     asPromise(): Promise<T> {
         return Promise.reject(this.error)
+    }
+
+    serialize(): SerializableResult<T, E> {
+        return { _tag: 'Err', error: this.error }
     }
 }
