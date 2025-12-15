@@ -1,67 +1,78 @@
+import { panic } from './panic'
+
 /**
  * A Result type inspired by Rust that represents either success (Ok) or failure (Err)
  */
-export type Result<T, E = Error> = Ok<T, E> | Err<T, E>
+export type Result<T, E = Error> = OkClass<T, E> | ErrClass<T, E>
 
 export namespace Result {
-    export function fromPromise<T, E = unknown>(
-        promise: Promise<T>,
-    ): Promise<Result<T, E>> {
+    export function fromPromise<T, E = unknown>(promise: Promise<T>): Promise<Result<T, E>> {
         return promise
-            .then((value) => new Ok<T, E>(value))
-            .catch((error) => new Err(error as E))
+            .then((value) => new OkClass<T, E>(value))
+            .catch((error) => new ErrClass(error as E))
     }
 
     /** Deserializes a SerializableResult into a Result. */
-    export function deserialize<T, E>(
-        obj: SerializableResult<T, E>,
-    ): Result<T, E> {
-        if (obj._tag === 'Ok') return new Ok(obj.value)
-        else return new Err(obj.error)
+    export function deserialize<T, E>(obj: SerializableResult<T, E>): Result<T, E> {
+        if (obj._tag === 'Ok') return new OkClass(obj.value)
+        return new ErrClass(obj.error)
+    }
+
+    export function Ok<T, E>(value: T): Result<T, E> {
+        return new OkClass(value)
+    }
+
+    export function Err<T, E>(error: E): Result<T, E> {
+        return new ErrClass(error)
+    }
+
+    /**
+     * Type guard to check if a value is a Result.
+     */
+    export function isResult(value: unknown): value is Result<unknown, unknown> {
+        return value instanceof OkClass || value instanceof ErrClass
     }
 }
 
-export type SerializableResult<T, E> =
-    | { _tag: 'Ok'; value: T }
-    | { _tag: 'Err'; error: E }
+export type SerializableResult<T, E> = { _tag: 'Ok'; value: T } | { _tag: 'Err'; error: E }
 
 export function ok<T, E>(value: T): Result<T, E> {
-    return new Ok(value)
+    return new OkClass(value)
 }
 
 export function err<T, E>(error: E): Result<T, E> {
-    return new Err(error)
+    return new ErrClass(error)
 }
 
-class Ok<T, E> {
+class OkClass<T, E> {
     readonly _tag = 'Ok'
     constructor(readonly value: T) {}
 
     /**
      * Returns true if the result is Ok.
      */
-    isOk(): this is Ok<T, E> {
+    isOk(): this is OkClass<T, E> {
         return true
     }
 
     /**
      * Returns true if the result is Err.
      */
-    isErr(): this is Err<T, E> {
+    isErr(): this is ErrClass<T, E> {
         return false
     }
 
     /**
      * Returns the contained Ok value.
      *
-     * Throws if the result is an Err.
+     * Panics if the result is an Err.
      * @example
      * ```ts
      * const res: Result<number, string> = ok(2)
      * const value: number = res.unwrap() // value is 2
      *
      * const errRes: Result<number, string> = err("fail")
-     * errRes.unwrap() // throws an error
+     * errRes.unwrap() // Panics
      * ```
      */
     unwrap(): T {
@@ -86,7 +97,7 @@ class Ok<T, E> {
     /**
      * Returns the contained Err value.
      *
-     * Throws if the result is an Ok.
+     * Panics if the result is an Ok.
      * @example
      * ```ts
      * const res: Result<number, string> = err("fail")
@@ -94,7 +105,22 @@ class Ok<T, E> {
      * ```
      */
     unwrapErr(): never {
-        throw new Error('Called unwrapErr on an Ok value')
+        panic(`called \`Result::unwrap_err()\` on an \`Ok\` value: ${this.value}`)
+    }
+
+    /**
+     * Returns the contained Ok value, or panics with a custom message if the result is an Err.
+     * @example
+     * ```ts
+     * const res: Result<number, string> = ok(2)
+     * const value: number = res.expect("Should be ok") // value is 2
+     *
+     * const errRes: Result<number, string> = err("fail")
+     * errRes.expect("Should be ok") // Panics with message "Should be ok: fail"
+     * ```
+     */
+    expect(_message: string): T {
+        return this.value
     }
 
     /**
@@ -106,7 +132,7 @@ class Ok<T, E> {
      * ```
      */
     map<U>(fn: (value: T) => U): Result<U, E> {
-        return new Ok(fn(this.value))
+        return new OkClass(fn(this.value))
     }
 
     /**
@@ -118,7 +144,7 @@ class Ok<T, E> {
      * ```
      */
     mapErr<F>(_fn: (err: E) => F): Result<T, F> {
-        return new Ok(this.value)
+        return new OkClass(this.value)
     }
 
     /**
@@ -179,7 +205,7 @@ class Ok<T, E> {
     }
 }
 
-class Err<T, E> {
+class ErrClass<T, E> {
     readonly _tag = 'Err'
     constructor(readonly error: E) {}
 
@@ -187,16 +213,16 @@ class Err<T, E> {
      * err value
      * @returns aa
      */
-    isOk(): this is Ok<T, E> {
+    isOk(): this is OkClass<T, E> {
         return false
     }
 
-    isErr(): this is Err<T, E> {
+    isErr(): this is ErrClass<T, E> {
         return true
     }
 
     unwrap(): never {
-        throw new Error(`Called unwrap on an Err value: ${this.error}`)
+        panic(`called \`Result::unwrap()\` on an \`Err\` value: ${this.error}`)
     }
 
     unwrapOr(defaultValue: T): T {
@@ -207,16 +233,20 @@ class Err<T, E> {
         return this.error
     }
 
+    expect(message: string): never {
+        panic(`${message}: ${this.error}`)
+    }
+
     map<U>(_fn: (value: T) => U): Result<U, E> {
         return this as unknown as Result<U, E>
     }
 
     mapErr<F>(fn: (err: E) => F): Result<T, F> {
-        return new Err(fn(this.error))
+        return new ErrClass(fn(this.error))
     }
 
     andThen<U>(_fn: (value: T) => Result<U, E>): Result<U, E> {
-        return new Err(this.error)
+        return new ErrClass(this.error)
     }
 
     match<U>(patterns: { ok: (value: T) => U; err: (error: E) => U }): U {
