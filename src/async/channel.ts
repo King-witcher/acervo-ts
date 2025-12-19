@@ -1,4 +1,4 @@
-import { delay, yieldExecution } from '@/utils/utils'
+import { yieldExecution } from '@/utils/utils'
 import { Semaphore } from './semaphore2'
 
 type Receiver<T> = (value: T) => void
