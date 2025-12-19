@@ -1,13 +1,11 @@
-import { Channel } from '@/async/channel'
+import { Channel } from '@/channels/channel'
 
 export namespace Streams {
     export async function* iter<T>(array: T[]): AsyncGenerator<T> {
         for (const item of array) yield item
     }
 
-    export async function* intoAsync<T>(
-        generator: Generator<T>,
-    ): AsyncGenerator<T> {
+    export async function* intoAsync<T>(generator: Generator<T>): AsyncGenerator<T> {
         for (const item of generator) yield item
     }
 
@@ -146,10 +144,7 @@ export namespace Streams {
         }
     }
 
-    export async function* readConcurrent<T>(
-        generator: AsyncGenerator<T>,
-        concurrency: number,
-    ) {
+    export async function* readConcurrent<T>(generator: AsyncGenerator<T>, concurrency: number) {
         const channel = new Channel<{ data: T } | null>()
         const resolvers = Array(concurrency)
             .fill(1)
@@ -169,9 +164,7 @@ export namespace Streams {
         }
     }
 
-    export async function collectSeq<T>(
-        stream: AsyncGenerator<T>,
-    ): Promise<T[]> {
+    export async function collectSeq<T>(stream: AsyncGenerator<T>): Promise<T[]> {
         const results: T[] = []
         for await (const item of stream) {
             results.push(item)

@@ -1,18 +1,38 @@
+import { Signal } from './signal'
+
 export class Semaphore {
-    private resolve = () => {}
-    private promise: Promise<void>
+    private waiters: Signal[] = []
 
-    constructor() {
-        this.promise = new Promise<void>((resolve) => {
-            this.resolve = resolve
-        })
+    constructor(private capacity: number) {}
+
+    async acquire(): Promise<Concession> {
+        if (!this.capacity) {
+            const signal = new Signal()
+            this.waiters.push(signal)
+            await signal.wait()
+        }
+
+        this.capacity--
+        return new Concession(this.release.bind(this))
     }
 
-    signal() {
-        this.resolve()
+    private release() {
+        this.capacity++
+        this.waiters.shift()?.signal()
+    }
+}
+
+class Concession {
+    released: boolean = false
+    constructor(private _release: () => void) {}
+
+    release() {
+        if (this.released) throw new Error('Permission already released')
+        this.released = true
+        this._release()
     }
 
-    async wait() {
-        return this.promise
+    [Symbol.dispose]() {
+        this.release()
     }
 }

@@ -1,4 +1,4 @@
-export class Semaphore {
+export class Signal {
     private resolve: () => void
     private promise: Promise<void>
 

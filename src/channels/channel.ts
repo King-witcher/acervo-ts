@@ -1,10 +1,10 @@
 import { yieldExecution } from '@/utils/utils'
-import { Semaphore } from './semaphore2'
+import { Signal } from '../async/signal2'
 
 type Receiver<T> = (value: T) => void
 type Sender<T> = {
     value: T
-    semaphore: Semaphore
+    signal: Signal
 }
 
 /**
@@ -35,7 +35,7 @@ export class Channel<T> {
             // Queue the data until a receiver is available
             this.senders.push({
                 value: data,
-                semaphore: new Semaphore(),
+                signal: new Signal(),
             })
         }
 
@@ -62,7 +62,7 @@ export class Channel<T> {
         if (sender) {
             // If data is immediately available, return it synchronously
             // Signal to the sender that the data has been received
-            sender.semaphore.signal()
+            sender.signal.signal()
             return sender.value
         } else {
             // If no data is available, enqueue as a receiver and wait
