@@ -1,7 +1,12 @@
-export async function delay(ms: number): Promise<void> {
+export async function delay(ms = 0): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 export async function defer(deferred: () => void) {
-    return Promise.resolve().then(deferred)
+    await delay()
+    deferred()
+}
+
+export async function yieldExecution() {
+    await delay()
 }
