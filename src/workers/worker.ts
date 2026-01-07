@@ -18,15 +18,25 @@ export class Worker<TInput, TOutput> {
         source: Array<TInput> | Generator<TInput> | AsyncGenerator<TInput>,
     ): Promise<void> {
         const { resolve, reject, promise } = Promise.withResolvers<void>()
+        let stop = false
 
         const workers = Array.from({ length: this.concurrency }).map(async () => {
             // If source is an array, convert it to an iterator to avoid repeated processing
             const source_ = Array.isArray(source) ? source.values() : source
             for await (const item of source_) {
+                if (stop) break
+
                 const result = await this.workerFn(item)
 
                 if (Array.isArray(this.output)) this.output.push(result)
-                else await this.output.send(result)
+                else {
+                    try {
+                        await this.output.send(result)
+                    } catch (e) {
+                        stop = true
+                        throw e
+                    }
+                }
             }
         })
 
