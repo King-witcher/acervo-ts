@@ -1,9 +1,9 @@
+import { Signal } from '@/async/signal2'
 import { yieldExecution } from '@/utils/utils'
 import { Channel } from './channel'
-import { Semaphore } from './semaphore2'
 
 export class BoundedChannel<T> extends Channel<T> {
-    private semaphores: Semaphore[] = []
+    private signals: Signal[] = []
 
     constructor(private capacity: number) {
         super()
@@ -17,8 +17,8 @@ export class BoundedChannel<T> extends Channel<T> {
     override async send(data: T): Promise<void> {
         // If the channel is full, backpressure the sender until the capacity is available
         if (super.length >= this.capacity) {
-            const semaphore = new Semaphore()
-            this.semaphores.push(semaphore)
+            const semaphore = new Signal()
+            this.signals.push(semaphore)
             await semaphore.wait()
         }
 
@@ -36,7 +36,7 @@ export class BoundedChannel<T> extends Channel<T> {
      */
     override async receive(): Promise<T> {
         // Signal to the oldest blocked sender that there is now capacity available
-        this.semaphores.shift()?.signal()
+        this.signals.shift()?.signal()
         return super.receive()
     }
 }
