@@ -12,10 +12,12 @@ export class WorkerPipe<TInput, TOutput> {
     private channel: Channel<TInput> = new Channel<TInput>()
 
     constructor(
-        private readonly worker: (input: TInput) => Promise<TOutput>,
+        private readonly workFn: (input: TInput) => Promise<TOutput>,
         private readonly destination: Pipe<TOutput>,
         private readonly maxConcurrency: number,
-    ) {}
+    ) {
+
+    }
 
     async write(input: TInput) {
         this.channel.send(input)
@@ -24,7 +26,7 @@ export class WorkerPipe<TInput, TOutput> {
     private async work() {
         for (;;) {
             const input = await this.channel.receive()
-            const output = await this.worker(input)
+            const output = await this.workFn(input)
             await this.destination.write(output)
         }
     }

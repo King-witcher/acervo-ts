@@ -1,12 +1,21 @@
 import { Signal } from '@/async/signal2'
 import { yieldExecution } from '@/utils/utils'
-import { Channel } from './channel'
+import type { IChannel } from './ichannel'
 
-export class BoundedChannel<T> extends Channel<T> {
+/**
+ * A bounded channel that limits the number of items that can be queued.
+ * If the channel reaches its capacity, senders are blocked until space is available.
+ */
+export class BoundedChannel<T> implements IChannel<T> {
     private signals: Signal[] = []
 
-    constructor(private capacity: number) {
-        super()
+    constructor(
+        private decoree: IChannel<T>,
+        private capacity: number,
+    ) {}
+
+    get length(): number {
+        return this.decoree.length
     }
 
     /**
@@ -14,29 +23,30 @@ export class BoundedChannel<T> extends Channel<T> {
      * If the channel is at maximum capacity, the sender waits until space is available.
      * Otherwise, returns immediately after sending the data.
      */
-    override async send(data: T): Promise<void> {
+    async send(data: T): Promise<void> {
         // If the channel is full, backpressure the sender until the capacity is available
-        if (super.length >= this.capacity) {
+        if (this.decoree.length >= this.capacity) {
             const semaphore = new Signal()
             this.signals.push(semaphore)
             await semaphore.wait()
         }
 
         // Send data to the channel, but don't wait for it to be received
-        super.send(data)
+        this.decoree.send(data)
 
         // Yield execution to allow receivers to run
         await yieldExecution()
     }
 
-    /**
-     * Receives data from the channel.
-     * If there is data in the queue, it is immediately returned.
-     * Otherwise, the receiver waits until data is sent to the channel.
-     */
-    override async receive(): Promise<T> {
+    async receive(): Promise<T> {
         // Signal to the oldest blocked sender that there is now capacity available
         this.signals.shift()?.signal()
-        return super.receive()
+        return this.decoree.receive()
+    }
+
+    async *iter(): AsyncGenerator<T> {
+        while (true) {
+            yield await this.receive()
+        }
     }
 }

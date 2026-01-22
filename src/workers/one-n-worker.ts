@@ -3,12 +3,14 @@ import { FiniteChannel } from '@/channels/finite-channel'
 
 /**
  * A worker that processes input data concurrently and sends the results to an output channel.
+ *
+ * Not necessarily every input will produce exactly one output.
  */
-export class Worker<TInput, TOutput> {
+export class OneNWorker<TInput, TOutput> {
     constructor(
         private output: Channel<TOutput> | Array<TOutput>,
         private concurrency: number,
-        private workerFn: (input: TInput) => Promise<TOutput>,
+        private workerFn: (input: TInput) => Promise<TOutput[]>,
     ) {}
 
     /**
@@ -28,12 +30,14 @@ export class Worker<TInput, TOutput> {
             for await (const item of source_) {
                 if (stop) break
 
-                const result = await this.workerFn(item)
+                const results = await this.workerFn(item)
 
-                if (Array.isArray(this.output)) this.output.push(result)
+                if (Array.isArray(this.output)) this.output.push(...results)
                 else {
                     try {
-                        await this.output.send(result)
+                        for (const result of results) {
+                            await this.output.send(result)
+                        }
                     } catch (e) {
                         stop = true
                         throw e

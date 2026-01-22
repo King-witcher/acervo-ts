@@ -1,5 +1,6 @@
 import { yieldExecution } from '@/utils/utils'
 import { Signal } from '../async/signal2'
+import type { IChannel } from './ichannel'
 
 type Receiver<T> = (value: T) => void
 type Sender<T> = {
@@ -7,25 +8,14 @@ type Sender<T> = {
     signal: Signal
 }
 
-/**
- * A simple FIFO channel for sending and receiving messages asynchronously.
- */
-export class Channel<T> {
+export class Channel<T> implements IChannel<T> {
     private senders: Sender<T>[] = []
     private receivers: Receiver<T>[] = []
 
-    /**
-     * Returns the number of items currently in the channel's queue.
-     */
     get length(): number {
         return this.senders.length
     }
 
-    /**
-     * Sends data to the channel.
-     * If there are any receivers waiting, the data is immediately delivered to the first one.
-     * Otherwise, the data is queued until a receiver is available.
-     */
     async send(data: T): Promise<void> {
         const receiver = this.receivers.shift()
         if (receiver) {
@@ -43,20 +33,12 @@ export class Channel<T> {
         await yieldExecution()
     }
 
-    /**
-     * Returns an async generator that yields values as they are received.
-     */
     async *iter(): AsyncGenerator<T> {
         while (true) {
             yield await this.receive()
         }
     }
 
-    /**
-     * Receives data from the channel.
-     * If there is data in the queue, it is immediately returned.
-     * Otherwise, the receiver waits until data is sent to the channel.
-     */
     async receive(): Promise<T> {
         const sender = this.senders.shift()
         if (sender) {
