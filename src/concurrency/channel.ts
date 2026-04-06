@@ -1,6 +1,6 @@
 import { yieldExecution } from '@/utils/utils'
-import { Signal } from '../async/signal2'
 import type { IChannel } from './ichannel'
+import { Signal } from './signal2'
 
 type Receiver<T> = (value: T) => void
 type Sender<T> = {

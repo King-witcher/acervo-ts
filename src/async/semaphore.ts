@@ -1,4 +1,4 @@
-import { Signal } from './signal'
+import { Signal } from '../concurrency/signal'
 
 export class Semaphore {
     private waiters: Signal[] = []
@@ -14,6 +14,10 @@ export class Semaphore {
 
         this.capacity--
         return new Concession(this.release.bind(this))
+    }
+
+    public createChildSemaphore(capacity: number): Semaphore {
+        return new ChildSemaphore(this, capacity)
     }
 
     private release() {
@@ -34,5 +38,23 @@ class Concession {
 
     [Symbol.dispose]() {
         this.release()
+    }
+}
+
+class ChildSemaphore extends Semaphore {
+    constructor(
+        private parent: Semaphore,
+        capacity: number,
+    ) {
+        super(capacity)
+    }
+
+    override async acquire(): Promise<Concession> {
+        const childConcession = await super.acquire()
+        const parentConcession = await this.parent.acquire()
+        return new Concession(() => {
+            childConcession.release()
+            parentConcession.release()
+        })
     }
 }

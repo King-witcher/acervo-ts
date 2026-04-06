@@ -1,4 +1,4 @@
-import { Signal } from '@/async/signal2'
+import { Signal } from '@/concurrency/signal2'
 import { yieldExecution } from '@/utils/utils'
 import type { IChannel } from './ichannel'
 

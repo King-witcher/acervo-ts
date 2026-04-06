@@ -1,4 +1,4 @@
-import { Channel } from '@/channels/channel'
+import { Channel } from '@/concurrency/channel'
 
 export namespace Streams {
     export async function* iter<T>(array: T[]): AsyncGenerator<T> {
