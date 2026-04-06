@@ -1,12 +1,18 @@
 import { yieldExecution } from '@/utils/utils'
 import { Channel } from './channel'
-import type { Semaphore } from './semaphore'
+import { Semaphore } from './semaphore'
 
 type WorkerProps<TInput, TOutput> = {
     output?: Channel<TOutput>
-    semaphore: Semaphore
     workerFn: (input: TInput) => Promise<TOutput[]>
-}
+} & (
+    | {
+          semaphore: Semaphore
+      }
+    | {
+          concurrency: number
+      }
+)
 
 export class Worker<TInput, TOutput> {
     readonly output: Channel<TOutput>
@@ -15,7 +21,7 @@ export class Worker<TInput, TOutput> {
 
     constructor(props: WorkerProps<TInput, TOutput>) {
         this.output = props.output ?? new Channel<TOutput>()
-        this.semaphore = props.semaphore
+        this.semaphore = 'semaphore' in props ? props.semaphore : new Semaphore(props.concurrency)
         this.worker = props.workerFn
     }
 

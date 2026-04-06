@@ -1,5 +1,8 @@
 import { Signal } from './signal'
 
+/**
+ * A counting FIFO semaphore implementation for managing concurrent access to a limited number of resources.
+ */
 export class Semaphore {
     private waiters: Signal[] = []
     private _slots: number
@@ -8,6 +11,9 @@ export class Semaphore {
         this._slots = value
     }
 
+    /**
+     * The current number of available slots in the semaphore.
+     */
     public get slots() {
         return this._slots
     }
