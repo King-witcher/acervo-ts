@@ -3,8 +3,8 @@ import { Channel } from './channel'
 import { Semaphore } from './semaphore'
 
 type WorkerProps<TInput, TOutput> = {
-    output?: Channel<TOutput>
     workerFn: (input: TInput) => Promise<TOutput[]>
+    output?: Channel<TOutput>
 } & (
     | {
           semaphore: Semaphore

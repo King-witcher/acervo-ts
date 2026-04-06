@@ -93,9 +93,7 @@ export class Channel<T> {
         while (true) {
             try {
                 yield await this.receive()
-            } catch (e) {
-                console.log(e)
-
+            } catch {
                 break
             }
         }
