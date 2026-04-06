@@ -2,10 +2,11 @@
     "name": "acervo-ts",
     "devDependencies": {
         "@biomejs/biome": "2.2.5",
-        "@types/bun": "latest"
+        "@types/bun": "latest",
+        "@types/node": "^25.5.2"
     },
     "peerDependencies": {
-        "typescript": "^5"
+        "typescript": "^5.9.3"
     },
     "scripts": {
         "buffered": "bun run benchmarks/buffered.bench.ts"
