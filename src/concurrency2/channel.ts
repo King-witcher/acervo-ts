@@ -1,5 +1,5 @@
-import { yieldExecution } from '@/utils/utils'
 import { type ISemaphoreSlot, Semaphore } from './semaphore'
+import { yieldExecution } from './yield'
 
 /**
  * A channel for asynchronously sending and receiving data between asynchronous tasks.

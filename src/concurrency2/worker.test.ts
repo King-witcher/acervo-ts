@@ -13,7 +13,7 @@ describe(Worker, () => {
             workerFn: async (n) => [n * 2],
         })
 
-        worker.digest([1, 2, 3]).then(() => worker.output.close())
+        worker.consume([1, 2, 3]).then(() => worker.output.close())
         const results = await worker.output.collect()
 
         expect(results.sort((a, b) => a - b)).toEqual([2, 4, 6])
@@ -26,7 +26,7 @@ describe(Worker, () => {
             workerFn: async (n) => [n],
         })
 
-        await expect(worker.digest([])).resolves.toBeUndefined()
+        await expect(worker.consume([])).resolves.toBeUndefined()
     })
 
     it('supports workerFn returning multiple outputs per item', async () => {
@@ -36,7 +36,7 @@ describe(Worker, () => {
             workerFn: async (n) => [n, n * 10],
         })
 
-        worker.digest([1, 2]).then(() => worker.output.close())
+        worker.consume([1, 2]).then(() => worker.output.close())
         const results = await worker.output.collect()
 
         expect(results.sort((a, b) => a - b)).toEqual([1, 2, 10, 20])
@@ -49,7 +49,7 @@ describe(Worker, () => {
             workerFn: async (n) => (n % 2 === 0 ? [n] : []),
         })
 
-        worker.digest([1, 2, 3, 4]).then(() => worker.output.close())
+        worker.consume([1, 2, 3, 4]).then(() => worker.output.close())
         const results = await worker.output.collect()
 
         expect(results.sort((a, b) => a - b)).toEqual([2, 4])
@@ -70,7 +70,7 @@ describe(Worker, () => {
             yield 3
         }
 
-        worker.digest(gen()).then(() => worker.output.close())
+        worker.consume(gen()).then(() => worker.output.close())
         const results = await worker.output.collect()
 
         expect(results.sort((a, b) => a - b)).toEqual([10, 20, 30])
@@ -89,7 +89,7 @@ describe(Worker, () => {
             yield 3
         }
 
-        worker.digest(asyncGen()).then(() => worker.output.close())
+        worker.consume(asyncGen()).then(() => worker.output.close())
         const results = await worker.output.collect()
 
         expect(results.sort((a, b) => a - b)).toEqual([10, 20, 30])
@@ -114,7 +114,7 @@ describe(Worker, () => {
             },
         })
 
-        await worker.digest([1, 2, 3, 4, 5, 6])
+        await worker.consume([1, 2, 3, 4, 5, 6])
 
         expect(peak).toBe(capacity)
     })
@@ -136,7 +136,7 @@ describe(Worker, () => {
             },
         })
 
-        await worker.digest([1, 2, 3, 4, 5, 6, 7, 8])
+        await worker.consume([1, 2, 3, 4, 5, 6, 7, 8])
 
         expect(exceeded).toBe(false)
     })
@@ -153,7 +153,7 @@ describe(Worker, () => {
             },
         })
 
-        await expect(worker.digest([1, 2, 3])).rejects.toThrow('worker failed')
+        await expect(worker.consume([1, 2, 3])).rejects.toThrow('worker failed')
     })
 
     it('stops processing new items after an error', async () => {
@@ -169,7 +169,7 @@ describe(Worker, () => {
             },
         })
 
-        await expect(worker.digest([1, 2, 3, 4, 5])).rejects.toThrow('abort')
+        await expect(worker.consume([1, 2, 3, 4, 5])).rejects.toThrow('abort')
 
         // Items after the error should not be processed
         expect(processed).not.toContain(3)
@@ -195,7 +195,7 @@ describe(Worker, () => {
         })
 
         // Item 2 and 3 will trigger the abort path (abort=true + break before try)
-        await expect(worker.digest([1, 2, 3])).rejects.toThrow('fail')
+        await expect(worker.consume([1, 2, 3])).rejects.toThrow('fail')
 
         // If slots were leaked, this acquire would block forever
         let acquired = false

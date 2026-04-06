@@ -1,6 +1,6 @@
-import { yieldExecution } from '@/utils/utils'
 import { Channel } from './channel'
 import { Semaphore } from './semaphore'
+import { yieldExecution } from './yield'
 
 type WorkerProps<TInput, TOutput> = {
     workerFn: (input: TInput) => Promise<TOutput[]>
@@ -8,8 +8,10 @@ type WorkerProps<TInput, TOutput> = {
 } & (
     | {
           semaphore: Semaphore
+          concurrency?: never
       }
     | {
+          semaphore?: never
           concurrency: number
       }
 )
@@ -21,7 +23,7 @@ export class Worker<TInput, TOutput> {
 
     constructor(props: WorkerProps<TInput, TOutput>) {
         this.output = props.output ?? new Channel<TOutput>()
-        this.semaphore = 'semaphore' in props ? props.semaphore : new Semaphore(props.concurrency)
+        this.semaphore = props.semaphore ?? new Semaphore(props.concurrency)
         this.worker = props.workerFn
     }
 
@@ -32,7 +34,7 @@ export class Worker<TInput, TOutput> {
      *
      * If the worker function fails, the error will be thrown and the worker will stop processing further items. Error handling and retry logic must be implemented by the worker function.
      */
-    async digest(source: Array<TInput> | Generator<TInput> | AsyncGenerator<TInput>) {
+    async consume(source: Array<TInput> | Generator<TInput> | AsyncGenerator<TInput>) {
         // Create a single iterator from the source
         const iterator = Array.isArray(source) ? source.values() : source
         let abort = false
@@ -65,5 +67,12 @@ export class Worker<TInput, TOutput> {
 
         // Wait for all workers to finish processing before returning
         await Promise.all(workers)
+    }
+
+    /**
+     * Same as consume.
+     */
+    async digest(source: Array<TInput> | Generator<TInput> | AsyncGenerator<TInput>) {
+        await this.consume(source)
     }
 }
