@@ -25,18 +25,18 @@ export class Semaphore {
     /**
      * Acquires a slot from the semaphore. If no slots are available, waits until one is released.
      */
-    public async acquire(): Promise<ISemaphoreSlot> {
+    public async acquire(): Promise<SemaphoreSlot> {
         // If there is no capacity, wait until one is available and acquire it directly without decrementing the capacity
         if (!this.slots) {
             const signal = new Signal()
             this.waiters.push(signal)
             await signal.wait()
-            return new SemaphoreSlot(this.release.bind(this))
+            return new SemaphoreSlotImpl(this.release.bind(this))
         }
 
-        // Otherwise, acquire capacity from the pool and return a concession
+        // Otherwise, acquire capacity from the pool and return a slot
         this.slots--
-        return new SemaphoreSlot(this.release.bind(this))
+        return new SemaphoreSlotImpl(this.release.bind(this))
     }
 
     /**
@@ -72,7 +72,7 @@ export class Semaphore {
     }
 }
 
-export interface ISemaphoreSlot {
+export interface SemaphoreSlot {
     /**
      * Releases the slot back to the semaphore.
      *
@@ -81,7 +81,7 @@ export interface ISemaphoreSlot {
     release(): void
 }
 
-class SemaphoreSlot implements ISemaphoreSlot {
+class SemaphoreSlotImpl implements SemaphoreSlot {
     released: boolean = false
     constructor(private _release: () => void) {}
 
@@ -104,10 +104,10 @@ class ChildSemaphore extends Semaphore {
         super(capacity)
     }
 
-    override async acquire(): Promise<SemaphoreSlot> {
+    override async acquire(): Promise<SemaphoreSlotImpl> {
         const childSlot = await super.acquire()
         const parentSlot = await this.parent.acquire()
-        return new SemaphoreSlot(() => {
+        return new SemaphoreSlotImpl(() => {
             childSlot.release()
             parentSlot.release()
         })

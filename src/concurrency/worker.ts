@@ -1,54 +1,78 @@
-import type { Channel } from '@/concurrency/channel'
-import { FiniteChannel } from '@/concurrency/finite-channel'
+import { Channel } from './channel'
+import { Semaphore } from './semaphore'
+import { yieldExecution } from './yield'
 
-/**
- * A worker that processes input data concurrently and sends the results to an output channel.
- */
+type WorkerProps<TInput, TOutput> = {
+    workerFn: (input: TInput) => Promise<TOutput[]>
+    output?: Channel<TOutput>
+} & (
+    | {
+          semaphore: Semaphore
+          concurrency?: never
+      }
+    | {
+          semaphore?: never
+          concurrency: number
+      }
+)
+
 export class Worker<TInput, TOutput> {
-    constructor(
-        private output: Channel<TOutput> | Array<TOutput>,
-        private concurrency: number,
-        private workerFn: (input: TInput) => Promise<TOutput>,
-    ) {}
+    readonly output: Channel<TOutput>
+    private semaphore: Semaphore
+    private worker: (input: TInput) => Promise<TOutput[]>
+
+    constructor(props: WorkerProps<TInput, TOutput>) {
+        this.output = props.output ?? new Channel<TOutput>()
+        this.semaphore = props.semaphore ?? new Semaphore(props.concurrency)
+        this.worker = props.workerFn
+    }
 
     /**
-     * Consumes data from the source, processes it using the worker function,
-     * and sends the results to the output channel or array.
+     * Digests items from the source, processes them with the worker function, and sends results to the output channel.
+     *
+     * Returns a promise that resolves when all items from the source have been processed and all worker tasks have completed.
+     *
+     * If the worker function fails, the error will be thrown and the worker will stop processing further items. Error handling and retry logic must be implemented by the worker function.
      */
-    async consume(
-        source: Array<TInput> | Generator<TInput> | AsyncGenerator<TInput>,
-    ): Promise<void> {
-        const { resolve, reject, promise } = Promise.withResolvers<void>()
-        let stop = false
+    async consume(source: Array<TInput> | Generator<TInput> | AsyncGenerator<TInput>) {
+        // Create a single iterator from the source
+        const iterator = Array.isArray(source) ? source.values() : source
+        let abort = false
 
-        // If source is an array, convert it to an iterator to avoid repeated processing
-        const source_ = Array.isArray(source) ? source.values() : source
+        const workerMain: () => Promise<void> = async () => {
+            for await (const item of iterator) {
+                if (abort) break
 
-        const workers = Array.from({ length: this.concurrency }).map(async () => {
-            for await (const item of source_) {
-                if (stop) break
-
-                const result = await this.workerFn(item)
-
-                if (Array.isArray(this.output)) this.output.push(result)
-                else {
-                    try {
+                const slot = await this.semaphore.acquire()
+                try {
+                    const results = await this.worker(item)
+                    for (const result of results) {
                         await this.output.send(result)
-                    } catch (e) {
-                        stop = true
-                        throw e
                     }
+                } catch (err) {
+                    abort = true
+                    throw err
+                } finally {
+                    // Release the slot back to the semaphore after processing each item
+                    slot.release()
+
+                    // Yields the thread to the event loop to allow other workers to acquire the semaphore if they are waiting, preventing starvation
+                    await yieldExecution()
                 }
             }
-        })
+        }
 
-        Promise.all(workers)
-            .then(() => resolve())
-            .catch(reject)
-            .finally(() => {
-                if (this.output instanceof FiniteChannel) this.output.close()
-            })
+        // Create a number of workers equal to the semaphore's capacity
+        const workers = Array.from({ length: this.semaphore.capacity }).map(workerMain)
 
-        return promise
+        // Wait for all workers to finish processing before returning
+        await Promise.all(workers)
+    }
+
+    /**
+     * Same as consume.
+     */
+    async digest(source: Array<TInput> | Generator<TInput> | AsyncGenerator<TInput>) {
+        await this.consume(source)
     }
 }
